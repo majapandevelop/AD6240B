@@ -3,7 +3,7 @@ Imports System.Windows.Forms.Application
 
 
 Partial Public Class INSTRUMENT
-    ' Add next lines in initialize function 
+    ' Add next two lines in initialize function 
     'Case "AD6240B"
     'er = ad6240b.OpenSession(parameter(2))
 
@@ -17,24 +17,24 @@ Partial Public Class INSTRUMENT
     Public Const mea_off As Integer = 0
     Public Const mea_voltage As Integer = 1
     Public Const mea_current As Integer = 2
-    Public Const mea_resistar As Integer = 3
+    Public Const mea_resistor As Integer = 3
 
-    Public gen_mode As String() = {"MD0", "MD1", "MD2", "MD3", "MD4"} 'DC, ﾊﾟﾙｽ, DCｽｲｰﾌﾟ, ﾊﾟﾙｽｽｲｰﾌﾟ, 低抵抗測定ﾊﾟﾙｽ
-    Public gen_v_ragne As String() = {"SVRX", "SVR3", "SVR4", "SVR5"} '最適, 300mV, 3V, 15V
-    Public gen_i_range As String() = {"SIRX", "SVR-1", "SVR0", "SVR1", "SVR2", "SVR3", "SVR4", "SVR5"} '最適, 30μA, 300μA, 3mA, 30mA, 300mA, 1A, 4A
+    Public cmd_gen_mode As String() = {"MD0", "MD1", "MD2", "MD3", "MD4"} 'DC, ﾊﾟﾙｽ, DCｽｲｰﾌﾟ, ﾊﾟﾙｽｽｲｰﾌﾟ, 低抵抗測定ﾊﾟﾙｽ
+    Public cmd_gen_v_range As String() = {"SVRX", "SVR 3", "SVR 4", "SVR 5"} '最適, 300mV, 3V, 15V
+    Public cmd_gen_i_range As String() = {"SIRX", "SIR -1", "SIR 0", "SIR 1", "SIR 2", "SIR 3", "SIR 4", "SIR 5"} '最適, 30μA, 300μA, 3mA, 30mA, 300mA, 1A, 4A
+    Public cmd_remote_sensing_mode As String() = {"RS0", "RS1"} '2Wire, 4Wire
 
     Public ad6240b As New AD6240B
 
-    Public Sub switch_on()
+    Public Sub device_switch_on()
         ad6240b.output(out_operate)
-        idform.Group_genarate.Enabled = False
-        idform.Button_POWER.BackColor = Color.Red
+        idform.change_device_swith_on_gui()
     End Sub
 
-    Public Sub switch_off()
+    Public Sub device_switch_off()
         ad6240b.output(out_standby)
-        idform.Group_genarate.Enabled = True
-        idform.Button_POWER.BackColor = Color.Silver
+        idform.change_device_switch_off_gui()
+        idform.get_gen_setting()
     End Sub
 
     Public Sub set_voltage(ByVal voltage As Double)
@@ -42,10 +42,20 @@ Partial Public Class INSTRUMENT
         ad6240b.set_gen_voltage(voltage)
     End Sub
 
+    Public Function get_voltage() As String
+        Dim res As String = ad6240b.get_gen_voltage()
+        Return res
+    End Function
+
     Public Sub set_current(ByVal current As Double)
         ad6240b.set_gen_function(gen_current)
         ad6240b.set_gen_current(current)
     End Sub
+
+    Public Function get_current() As String
+        Dim res As String = ad6240b.get_gen_current()
+        Return res
+    End Function
 
     Public Function measure_voltage() As Double
         ad6240b.mea_function(mea_voltage)
@@ -57,64 +67,72 @@ Partial Public Class INSTRUMENT
         Return ad6240b.measure_current()
     End Function
 
-    Public Function get_gen_mode() As Integer
-        Return Array.IndexOf(gen_mode, ad6240b.read_string("MD?"))
-    End Function
-
-    Public Sub set_gen_mode(ByVal mode_index As String)
-        ad6240b.send_message(gen_mode(mode_index))
-        For Each radio As RadioButton In idform.Group_gen_mode.Controls
-            If radio.TabIndex = mode_index Then
-                radio.Checked = True
-                Exit For
-            End If
-        Next
+    Public Sub set_gen_mode(ByVal cmd_mode As String)
+        ad6240b.send_message(cmd_mode)
+        idform.change_gen_mode_gui(cmd_mode)
     End Sub
 
-    Public Function get_gen_v_range() As Integer
-        Return Array.IndexOf(gen_mode, ad6240b.read_string("MD?").Substring(4))
-    End Function
-
-    Public Sub set_gen_v_range(ByVal range_index As String)
-        ad6240b.send_message(gen_v_ragne(range_index))
-        For Each radio As RadioButton In idform.Group_gen_v_range.Controls
-            If radio.TabIndex = range_index Then
-                radio.Checked = True
-                Exit For
-            End If
-        Next
+    Public Sub set_gen_v_range(ByVal cmd_v_range As String)
+        ad6240b.send_message(cmd_v_range)
+        idform.change_gen_v_range_gui(cmd_v_range)
     End Sub
 
-    Public Function get_gen_i_range() As String
-        Dim range As String = ad6240b.read_string("SIR?")
-        Select Case range.Substring(3, 1)
-            Case "X"
-                Return 0
-            Case "-"
-                Return 1
-            Case "0"
-                Return 2
-            Case "1"
-                Return 3
-            Case "2"
-                Return 4
-            Case "3"
-                Return 5
-            Case "4"
-                Return 6
-            Case "5"
-                Return 7
+    Public Sub set_gen_i_range(ByVal cmd_i_range As String)
+        ad6240b.send_message(cmd_i_range)
+        idform.change_gen_i_range_gui(cmd_i_range)
+    End Sub
+
+    Public Sub set_limit_voltage(ByVal data1 As String, ByVal data2 As String)
+        ad6240b.set_limit_voltage(data1, data2)
+    End Sub
+
+    Public Sub get_limit_voltage(ByRef high_v As String, ByRef low_v As String)
+        ad6240b.get_limit_voltage(high_v, low_v)
+    End Sub
+
+    Public Sub set_limit_current(ByVal data1 As String, ByVal data2 As String)
+        Dim high_i As Double = data1 / 1000
+        Dim low_i As Double = data2 / 1000
+        ad6240b.set_limit_current(high_i, low_i)
+    End Sub
+
+    Public Sub get_limit_current(ByRef high_i As String, ByRef low_i As String)
+        ad6240b.get_limit_current(high_i, low_i)
+        high_i *= 1000
+        low_i *= 1000
+    End Sub
+
+    Public Sub send_message(ByVal message As String)
+        ad6240b.send_message(message)
+    End Sub
+
+    Public Function read_string(ByVal message As String) As String
+        Return ad6240b.read_string(message)
+    End Function
+
+    Public Sub set_trigger_mode_to_auto()
+        ad6240b.set_trigger_mode_to_auto()
+    End Sub
+
+    Public Sub set_trigger_mode_to_hold()
+        ad6240b.set_trigger_mode_to_hold()
+    End Sub
+
+    Public Sub set_2wire()
+        ad6240b.set_2wire()
+    End Sub
+
+    Public Sub set_4wire()
+        ad6240b.set_4wire()
+    End Sub
+
+    Public Sub get_wire()
+        Dim res As String = ad6240b.get_wire().Trim()
+        Select Case res
+            Case cmd_remote_sensing_mode(0)
+                idform.Radio_2wire.Checked = True
+            Case cmd_remote_sensing_mode(1)
+                idform.Radio_4wire.Checked = True
         End Select
-        Return 0
-    End Function
-
-    Public Sub set_gen_i_range(ByVal range_index As String)
-        ad6240b.send_message(gen_i_range(range_index))
-        For Each radio As RadioButton In idform.Group_gen_i_range.Controls
-            If radio.TabIndex = range_index Then
-                radio.Checked = True
-                Exit For
-            End If
-        Next
     End Sub
 End Class
